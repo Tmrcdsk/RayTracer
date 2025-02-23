@@ -5,6 +5,8 @@
 
 #include "Vector.h"
 
+#define PI 3.14159265358979323846
+
 struct Ray
 {
 	vec3 orig;
@@ -57,13 +59,15 @@ void render(const Sphere& sphere)
 {
 	const int width = 1280;
 	const int height = 720;
+	float fov = (float)PI / 2; // 45бу
+	float aspect = (float)width / height;
 
 	std::vector<vec3> framebuffer(width * height);
 
 	for (uint32_t j = 0; j < height; ++j) {
 		for (uint32_t i = 0; i < width; ++i) {
-			float x = (2 * (i + 0.5f) / (float)width - 1.0f);
-			float y = -(2 * (j + 0.5f) / (float)height - 1.0f);
+			float x = (2 * (i + 0.5f) / (float)width - 1.0f) * tan(fov / 2.0f) * aspect;
+			float y = -(2 * (j + 0.5f) / (float)height - 1.0f) * tan(fov / 2.0f);
 			vec3 dir = vec3(x, y, -1).normalized();
 			framebuffer[i + j * width] = castRay(Ray(vec3(0.0f), dir), sphere);
 		}
