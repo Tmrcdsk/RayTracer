@@ -7,6 +7,13 @@
 
 #define PI 3.14159265358979323846
 
+struct Light
+{
+	Light(const vec3& p, float i) : position(p), intensity(i) {}
+	vec3 position;
+	float intensity;
+};
+
 struct Material
 {
 	Material(const vec3& color) : diffuse_color(color) {}
@@ -68,18 +75,24 @@ bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& h
 	return sphere_dist < 1000.0f;
 }
 
-vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres)
+vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vector<Light>& lights)
 {
 	vec3 point, N;
 	Material material;
 	// background color
 	if (!scene_intersect(ray, spheres, point, N, material))
 		return vec3(0.2f, 0.3f, 0.8f);
+
+	float diffuse_light_intensity = 0;
+	for (uint32_t i = 0; i < lights.size(); ++i) {
+		vec3 light_dir = (lights[i].position - point).normalized();
+		diffuse_light_intensity += lights[i].intensity * std::max(0.0f, dot(light_dir, N));
+	}
 	// sphere color
-	return material.diffuse_color;
+	return diffuse_light_intensity * material.diffuse_color;
 }
 
-void render(const std::vector<Sphere>& spheres)
+void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights)
 {
 	const int width = 1280;
 	const int height = 720;
@@ -93,7 +106,7 @@ void render(const std::vector<Sphere>& spheres)
 			float x = (2 * (i + 0.5f) / (float)width - 1.0f) * tan(fov / 2.0f) * aspect;
 			float y = -(2 * (j + 0.5f) / (float)height - 1.0f) * tan(fov / 2.0f);
 			vec3 dir = vec3(x, y, -1).normalized();
-			framebuffer[i + j * width] = castRay(Ray(vec3(0.0f), dir), spheres);
+			framebuffer[i + j * width] = castRay(Ray(vec3(0.0f), dir), spheres, lights);
 		}
 	}
 
@@ -119,6 +132,9 @@ int main()
 	spheres.emplace_back(vec3(1.5, -0.5, -18), 3, red);
 	spheres.emplace_back(vec3(7, 5, -18), 4, ivory);
 
-	render(spheres);
+	std::vector<Light> lights;
+	lights.emplace_back(vec3(-20, 20, 20), 1.5);
+
+	render(spheres, lights);
 	return 0;
 }
