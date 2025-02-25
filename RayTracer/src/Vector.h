@@ -31,3 +31,32 @@ vec3 operator*(float k, const vec3& v) { return vec3(k * v.x, k * v.y, k * v.z);
 
 float dot(const vec3& a, const vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 vec3 cross(const vec3& a, const vec3& b) { return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
+
+struct vec2
+{
+	float x, y;
+
+	vec2() : x(0.0f), y(0.0f) {}
+	vec2(float x) : x(x), y(x) {}
+	vec2(float x, float y) : x(x), y(y) {}
+
+	float& operator[](int index) { return index == 0 ? x : y; }
+	const float& operator[](int index) const { return index == 0 ? x : y; }
+
+	vec2 operator+(const vec2& other) const { return vec2(x + other.x, y + other.y); }
+	vec2 operator-(const vec2& other) const { return vec2(x - other.x, y - other.y); }
+	vec2 operator-() const { return vec2(-x, -y); }
+	vec2 operator*(const vec2& other) const { return vec2(x * other.x, y * other.y); }
+	vec2 operator*(float k) const { return vec2(k * x, k * y); } // ÓÒ³Ë
+	friend vec2 operator*(float k, const vec2& v); // ×ó³Ë
+
+	float norm() const { return sqrt(x * x + y * y); }
+	float norm2() const { return x * x + y * y; }
+	vec2 normalized() const
+	{
+		float length = norm();
+		return vec2(x / length, y / length);
+	}
+};
+
+vec2 operator*(float k, const vec2& v) { return vec2(k * v.x, k * v.y); }

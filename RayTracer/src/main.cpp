@@ -16,9 +16,11 @@ struct Light
 
 struct Material
 {
-	Material(const vec3& color) : diffuse_color(color) {}
-	Material() : diffuse_color() {}
+	Material(const vec2& a, const vec3& color, float spec) : albedo(a), diffuse_color(color), specular_exponent(spec) {}
+	Material() : albedo(1, 0), diffuse_color(), specular_exponent() {}
+	vec2 albedo;
 	vec3 diffuse_color;
+	float specular_exponent;
 };
 
 struct Ray
@@ -60,6 +62,11 @@ struct Sphere
 	}
 };
 
+vec3 reflect(const vec3& L, const vec3& N)
+{
+	return 2 * dot(L, N) * N - L;
+}
+
 bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& hitPoint, vec3& N, Material& material)
 {
 	float sphere_dist = std::numeric_limits<float>::max();
@@ -83,13 +90,15 @@ vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vect
 	if (!scene_intersect(ray, spheres, point, N, material))
 		return vec3(0.2f, 0.3f, 0.8f);
 
-	float diffuse_light_intensity = 0;
+	float diffuse_light_intensity = 0, specular_light_intensity = 0;
 	for (uint32_t i = 0; i < lights.size(); ++i) {
 		vec3 light_dir = (lights[i].position - point).normalized();
 		diffuse_light_intensity += lights[i].intensity * std::max(0.0f, dot(light_dir, N));
+		specular_light_intensity += lights[i].intensity * powf(std::max(0.0f, dot(reflect(light_dir, N), -ray.dir)), material.specular_exponent);
 	}
 	// sphere color
-	return diffuse_light_intensity * material.diffuse_color;
+	return diffuse_light_intensity * material.diffuse_color * material.albedo[0]
+		+ specular_light_intensity * vec3(1.0f) * material.albedo[1];
 }
 
 void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights)
@@ -114,6 +123,9 @@ void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights
 	ofs.open("out.ppm", std::ios::binary);
 	ofs << "P6\n" << width << " " << height << "\n255\n";
 	for (uint32_t i = 0; i < width * height; ++i) {
+		vec3& c = framebuffer[i];
+		float max = std::max(c[0], std::max(c[1], c[2]));
+		if (max > 1) c = c * (1.0f / max);
 		for (uint32_t j = 0; j < 3; ++j) {
 			ofs << (char)(255 * std::max(0.0f, std::min(1.0f, framebuffer[i][j])));
 		}
@@ -123,8 +135,8 @@ void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights
 
 int main()
 {
-	Material ivory(vec3(0.4f, 0.4f, 0.3f));
-	Material red(vec3(0.8f, 0.2f, 0.3f));
+	Material ivory(vec2(0.6f, 0.3f), vec3(0.4f, 0.4f, 0.3f), 50.0f);
+	Material red(vec2(0.9f, 0.1f), vec3(0.3f, 0.1f, 0.1f), 10.0f);
 	
 	std::vector<Sphere> spheres;
 	spheres.emplace_back(vec3(-3, 0, -16), 2, ivory);
@@ -133,7 +145,9 @@ int main()
 	spheres.emplace_back(vec3(7, 5, -18), 4, ivory);
 
 	std::vector<Light> lights;
-	lights.emplace_back(vec3(-20, 20, 20), 1.5);
+	lights.emplace_back(vec3(-20, 20, 20), 1.5f);
+	lights.emplace_back(vec3(30, 50, -25), 1.8f);
+	lights.emplace_back(vec3(30, 20, 30), 1.7f);
 
 	render(spheres, lights);
 	return 0;
