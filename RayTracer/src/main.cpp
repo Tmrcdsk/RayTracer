@@ -16,9 +16,10 @@ struct Light
 
 struct Material
 {
-	Material(const vec3& a, const vec3& color, float spec) : albedo(a), diffuse_color(color), specular_exponent(spec) {}
-	Material() : albedo(1, 0, 0), diffuse_color(), specular_exponent() {}
-	vec3 albedo;
+	Material(float r, const vec4& a, const vec3& color, float spec) : refractive_index(r), albedo(a), diffuse_color(color), specular_exponent(spec) {}
+	Material() : refractive_index(1.0f), albedo(1, 0, 0, 0), diffuse_color(), specular_exponent() {}
+	float refractive_index;
+	vec4 albedo;
 	vec3 diffuse_color;
 	float specular_exponent;
 };
@@ -62,9 +63,25 @@ struct Sphere
 	}
 };
 
+// 特别说明：这里的reflect函数的入射方向是由点指向光源的，而refract函数的入射方向则是由光源指向点
 vec3 reflect(const vec3& L, const vec3& N)
 {
 	return 2 * dot(L, N) * N - L;
+}
+
+vec3 refract(const vec3& L, const vec3& N, float refractive_index)
+{
+	float cosi = -std::max(-1.0f, std::min(1.0f, dot(L, N)));
+	float etai = 1, etat = refractive_index;
+	vec3 n = N;
+	if (cosi < 0) {
+		cosi = -cosi;
+		std::swap(etai, etat);
+		n = -N;
+	}
+	float eta = etai / etat;
+	float k = 1 - eta * eta * (1 - cosi * cosi);
+	return k < 0 ? vec3(0.0f) : eta * L + (eta * cosi - sqrtf(k)) * n;
 }
 
 bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& hitPoint, vec3& N, Material& material)
@@ -91,8 +108,12 @@ vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vect
 		return vec3(0.2f, 0.3f, 0.8f);
 
 	vec3 reflect_dir = reflect(-ray.dir, N).normalized();
-	vec3 reflect_orig = dot(-ray.dir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
+	vec3 reflect_orig = dot(reflect_dir, N) < 0 ? point - N * 0.001f : point + N * 0.001f; // 修改了一个小错误
 	vec3 reflect_color = castRay(Ray(reflect_orig, reflect_dir), spheres, lights, depth + 1);
+	
+	vec3 refract_dir = refract(ray.dir, N, material.refractive_index).normalized();
+	vec3 refract_orig = dot(refract_dir, N) < 0 ? point - N * 0.001f : point + N * 0.001f;
+	vec3 refract_color = castRay(Ray(refract_orig, refract_dir), spheres, lights, depth + 1);
 
 	float diffuse_light_intensity = 0, specular_light_intensity = 0;
 	for (uint32_t i = 0; i < lights.size(); ++i) {
@@ -111,7 +132,8 @@ vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vect
 	// sphere color
 	return diffuse_light_intensity * material.diffuse_color * material.albedo[0]
 		+ specular_light_intensity * vec3(1.0f) * material.albedo[1]
-		+ reflect_color * material.albedo[2];
+		+ reflect_color * material.albedo[2]
+		+ refract_color * material.albedo[3];
 }
 
 void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights)
@@ -148,13 +170,14 @@ void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights
 
 int main()
 {
-	Material ivory(vec3(0.6f, 0.3f, 0.1f), vec3(0.4f, 0.4f, 0.3f), 50.0f);
-	Material red(vec3(0.9f, 0.1f, 0.0f), vec3(0.3f, 0.1f, 0.1f), 10.0f);
-	Material mirror(vec3(0.0f, 10.0f, 0.8f), vec3(1.0f), 1425.0f);
-	
+	Material ivory(1.0f, vec4(0.6f, 0.3f, 0.1f, 0.0f), vec3(0.4f, 0.4f, 0.3f), 50.0f);
+	Material red(1.0f, vec4(0.9f, 0.1f, 0.0f, 0.0f), vec3(0.3f, 0.1f, 0.1f), 10.0f);
+	Material mirror(1.0f, vec4(0.0f, 10.0f, 0.8f, 0.0f), vec3(1.0f), 1425.0f);
+	Material glass(1.5f, vec4(0.0f, 0.5f, 0.1f, 0.8f), vec3(0.6f, 0.7f, 0.8f), 125.0f);
+
 	std::vector<Sphere> spheres;
 	spheres.emplace_back(vec3(-3, 0, -16), 2, ivory);
-	spheres.emplace_back(vec3(-1.0, -1.5, -12), 2, mirror);
+	spheres.emplace_back(vec3(-1.0, -1.5, -12), 2, glass);
 	spheres.emplace_back(vec3(1.5, -0.5, -18), 3, red);
 	spheres.emplace_back(vec3(7, 5, -18), 4, mirror);
 

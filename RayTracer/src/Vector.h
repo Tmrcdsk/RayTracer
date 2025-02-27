@@ -1,5 +1,34 @@
 #pragma once
 
+struct vec4
+{
+	float x, y, z, w;
+
+	vec4() : x(0.0f), y(0.0f), z(0.0f), w(0.0f) {}
+	vec4(float x) : x(x), y(x), z(x), w(x) {}
+	vec4(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+
+	float& operator[](int index) { return index == 0 ? x : (index == 1 ? y : (index == 2 ? z : w)); }
+	const float& operator[](int index) const { return index == 0 ? x : (index == 1 ? y : (index == 2 ? z : w)); }
+
+	vec4 operator+(const vec4& other) const { return vec4(x + other.x, y + other.y, z + other.z, w + other.w); }
+	vec4 operator-(const vec4& other) const { return vec4(x - other.x, y - other.y, z - other.z, w - other.w); }
+	vec4 operator-() const { return vec4(-x, -y, -z, -w); }
+	vec4 operator*(const vec4& other) const { return vec4(x * other.x, y * other.y, z * other.z, w * other.w); }
+	vec4 operator*(float k) const { return vec4(k * x, k * y, k * z, k * w); }
+	friend vec4 operator*(float k, const vec4& v);
+
+	float norm() const { return sqrt(x * x + y * y + z * z + w * w); }
+	float norm2() const { return x * x + y * y + z * z + w * w; }
+	vec4 normalized() const
+	{
+		float length = norm();
+		return vec4(x / length, y / length, z / length, w / length);
+	}
+};
+
+vec4 operator*(float k, const vec4& v) { return vec4(k * v.x, k * v.y, k * v.z, k * v.w); }
+
 struct vec3
 {
 	float x, y, z;
