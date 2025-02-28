@@ -96,7 +96,20 @@ bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& h
 			material = sphere.material;
 		}
 	}
-	return sphere_dist < 1000.0f;
+
+	float checkerboard_dist = std::numeric_limits<float>::max();
+	if (fabs(ray.dir.y) > 1e-3) {
+		float d = -(ray.orig.y + 4) / ray.dir.y; // the checkerboard plane has equation y = -4
+		vec3 pt = ray.orig + ray.dir * d;
+		if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < sphere_dist) {
+			checkerboard_dist = d;
+			hitPoint = pt;
+			N = vec3(0.0f, 1.0f, 0.0f);
+			material.diffuse_color = (int(0.5f * hitPoint.x + 1000) + int(0.5f * hitPoint.z)) & 1 ? vec3(1.0f) : vec3(1.0f, 0.7f, 0.3f); // ÉèÖÃÎªÆåÅÌÍ¼°¸
+			material.diffuse_color = material.diffuse_color * 0.3f;
+		}
+	}
+	return std::min(sphere_dist, checkerboard_dist) < 1000.0f;
 }
 
 vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vector<Light>& lights, size_t depth = 0)
