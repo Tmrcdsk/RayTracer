@@ -5,7 +5,15 @@
 
 #include "Vector.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 #define PI 3.14159265358979323846
+
+int envmap_width, envmap_height;
+std::vector<vec3> envmap;
 
 struct Light
 {
@@ -117,8 +125,28 @@ vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vect
 	vec3 point, N;
 	Material material;
 	// background color
-	if (depth > 4 || !scene_intersect(ray, spheres, point, N, material))
-		return vec3(0.2f, 0.3f, 0.8f);
+	if (depth > 4 || !scene_intersect(ray, spheres, point, N, material)) {
+		// background color
+		float phi = atan2(ray.dir.z, ray.dir.x); // [-π, π]
+		float theta = acos(ray.dir.y); // [0, π]
+		// ensure x and y in range
+		int x = std::max(0, std::min(envmap_width - 1, int((phi + PI) / (2 * PI) * envmap_width)));
+		int y = std::max(0, std::min(envmap_height - 1, int(theta / PI * envmap_height)));
+		return envmap[x + y * envmap_width];
+	}
+	/*
+	- atan2：返回值 [-π, π]
+		- 几何意义：atan2 返回的是 从 X 轴正方向逆时针旋转到向量 (x, z) 的角度，正值为逆时针方向（0 → π），负值为顺时针方向（-0 → -π）。
+		- 符号一致性：当 x < 0 时（即向量指向 X 轴负方向），atan2 会自动将角度偏移 ±π，确保结果始终在 [-π, π] 内。
+		- 例如：
+		- 光线方向沿 X 正轴（x=1, z=0）→ φ = 0
+		- 光线方向沿 X 负轴（x=-1, z=0）→ φ = π
+		- 光线方向沿 Z 正轴（x=0, z=1）→ φ = π/2
+		- 光线方向沿 Z 负轴（x=0, z=-1）→ φ = -π/2
+	- acos：返回值 [0, π]
+		- acos(1) = 0
+		- acos(-1) = π
+	 */
 
 	vec3 reflect_dir = reflect(-ray.dir, N).normalized();
 	vec3 reflect_orig = dot(reflect_dir, N) < 0 ? point - N * 0.001f : point + N * 0.001f; // 修改了一个小错误
@@ -167,22 +195,35 @@ void render(const std::vector<Sphere>& spheres, const std::vector<Light>& lights
 		}
 	}
 
-	std::ofstream ofs;
-	ofs.open("out.ppm", std::ios::binary);
-	ofs << "P6\n" << width << " " << height << "\n255\n";
+	std::vector<unsigned char> pixmap(width * height * 3);
+
 	for (uint32_t i = 0; i < width * height; ++i) {
 		vec3& c = framebuffer[i];
 		float max = std::max(c[0], std::max(c[1], c[2]));
 		if (max > 1) c = c * (1.0f / max);
 		for (uint32_t j = 0; j < 3; ++j) {
-			ofs << (char)(255 * std::max(0.0f, std::min(1.0f, framebuffer[i][j])));
+			pixmap[i * 3 + j] = (unsigned char)(255 * std::max(0.0f, std::min(1.0f, framebuffer[i][j])));
 		}
 	}
-	ofs.close();
+	stbi_write_jpg("out.jpg", width, height, 3, pixmap.data(), 100);
 }
 
 int main()
 {
+	int channel = -1;
+	unsigned char* pixmap = stbi_load("./envmap.jpg", &envmap_width, &envmap_height, &channel, 0);
+	if (!pixmap || channel != 3) {
+		std::cerr << "Error: can not load the environment map!" << std::endl;
+		return -1;
+	}
+	envmap.reserve(envmap_width * envmap_height);
+	for (int j = envmap_height - 1; j >= 0; --j) {
+		for (int i = 0; i < envmap_width; ++i) {
+			envmap[i + j * envmap_width] = vec3(pixmap[(i + j * envmap_width) * 3 + 0], pixmap[(i + j * envmap_width) * 3 + 1], pixmap[(i + j * envmap_width) * 3 + 2]) * (1.0f / 255.0f);
+		}
+	}
+	stbi_image_free(pixmap);
+
 	Material ivory(1.0f, vec4(0.6f, 0.3f, 0.1f, 0.0f), vec3(0.4f, 0.4f, 0.3f), 50.0f);
 	Material red(1.0f, vec4(0.9f, 0.1f, 0.0f, 0.0f), vec3(0.3f, 0.1f, 0.1f), 10.0f);
 	Material mirror(1.0f, vec4(0.0f, 10.0f, 0.8f, 0.0f), vec3(1.0f), 1425.0f);
