@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+
 struct vec4
 {
 	float x, y, z, w;
@@ -16,7 +18,7 @@ struct vec4
 	vec4 operator-() const { return vec4(-x, -y, -z, -w); }
 	vec4 operator*(const vec4& other) const { return vec4(x * other.x, y * other.y, z * other.z, w * other.w); }
 	vec4 operator*(float k) const { return vec4(k * x, k * y, k * z, k * w); }
-	friend vec4 operator*(float k, const vec4& v);
+	friend inline vec4 operator*(float k, const vec4& v);
 
 	float norm() const { return sqrt(x * x + y * y + z * z + w * w); }
 	float norm2() const { return x * x + y * y + z * z + w * w; }
@@ -27,7 +29,7 @@ struct vec4
 	}
 };
 
-vec4 operator*(float k, const vec4& v) { return vec4(k * v.x, k * v.y, k * v.z, k * v.w); }
+inline vec4 operator*(float k, const vec4& v) { return vec4(k * v.x, k * v.y, k * v.z, k * v.w); }
 
 struct vec3
 {
@@ -45,7 +47,7 @@ struct vec3
 	vec3 operator-() const { return vec3(-x, -y, -z); }
 	vec3 operator*(const vec3& other) const { return vec3(x * other.x, y * other.y, z * other.z); }
 	vec3 operator*(float k) const { return vec3(k * x, k * y, k * z); } // ÓÒ³Ë
-	friend vec3 operator*(float k, const vec3& v); // ×ó³Ë
+	friend inline vec3 operator*(float k, const vec3& v); // ×ó³Ë
 
 	float norm() const { return sqrt(x * x + y * y + z * z); }
 	float norm2() const { return x * x + y * y + z * z; }
@@ -56,10 +58,10 @@ struct vec3
 	}
 };
 
-vec3 operator*(float k, const vec3& v) { return vec3(k * v.x, k * v.y, k * v.z); }
+inline vec3 operator*(float k, const vec3& v) { return vec3(k * v.x, k * v.y, k * v.z); }
 
-float dot(const vec3& a, const vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-vec3 cross(const vec3& a, const vec3& b) { return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
+inline float dot(const vec3& a, const vec3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+inline vec3 cross(const vec3& a, const vec3& b) { return vec3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
 
 struct vec2
 {
@@ -77,7 +79,7 @@ struct vec2
 	vec2 operator-() const { return vec2(-x, -y); }
 	vec2 operator*(const vec2& other) const { return vec2(x * other.x, y * other.y); }
 	vec2 operator*(float k) const { return vec2(k * x, k * y); } // ÓÒ³Ë
-	friend vec2 operator*(float k, const vec2& v); // ×ó³Ë
+	friend inline vec2 operator*(float k, const vec2& v); // ×ó³Ë
 
 	float norm() const { return sqrt(x * x + y * y); }
 	float norm2() const { return x * x + y * y; }
@@ -88,4 +90,4 @@ struct vec2
 	}
 };
 
-vec2 operator*(float k, const vec2& v) { return vec2(k * v.x, k * v.y); }
+inline vec2 operator*(float k, const vec2& v) { return vec2(k * v.x, k * v.y); }

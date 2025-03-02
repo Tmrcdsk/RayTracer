@@ -1,9 +1,10 @@
-#include <iostream>
+#include "global.h"
+
 #include <fstream>
 #include <vector>
-#include <cmath>
 
-#include "Vector.h"
+#include "Hittable.h"
+#include "Sphere.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -20,55 +21,6 @@ struct Light
 	Light(const vec3& p, float i) : position(p), intensity(i) {}
 	vec3 position;
 	float intensity;
-};
-
-struct Material
-{
-	Material(float r, const vec4& a, const vec3& color, float spec) : refractive_index(r), albedo(a), diffuse_color(color), specular_exponent(spec) {}
-	Material() : refractive_index(1.0f), albedo(1, 0, 0, 0), diffuse_color(), specular_exponent() {}
-	float refractive_index;
-	vec4 albedo;
-	vec3 diffuse_color;
-	float specular_exponent;
-};
-
-struct Ray
-{
-	vec3 orig;
-	vec3 dir;
-
-	Ray() : orig(0.0f), dir(0.0f) {}
-	Ray(const vec3& o, const vec3& d) : orig(o), dir(d) {}
-
-	vec3 at(float t) const { return orig + t * dir; }
-};
-
-struct Sphere
-{
-	vec3 center;
-	float radius;
-	Material material;
-
-	Sphere() : center(0.0f), radius(0.0f), material() {}
-	Sphere(const vec3& c, float r, const Material& m) : center(c), radius(r), material(m) {}
-
-	bool hit(const Ray& ray, float& t0) const {
-		vec3 L = center - ray.orig;
-
-		float a = dot(ray.dir, ray.dir);
-		float b = -2.0f * dot(ray.dir, L);
-		float c = dot(L, L) - radius * radius;
-
-		float discriminant = b * b - 4 * a * c;
-		if (discriminant < 0)
-			return false;
-
-		t0 = (-b - std::sqrt(discriminant)) / (2.0f * a);
-		float t1 = (-b + std::sqrt(discriminant)) / (2.0f * a);
-		if (t0 < 0) t0 = t1;
-		if (t0 < 0) return false;
-		return true;
-	}
 };
 
 // 特别说明：这里的reflect函数的入射方向是由点指向光源的，而refract函数的入射方向则是由光源指向点
@@ -92,16 +44,16 @@ vec3 refract(const vec3& L, const vec3& N, float refractive_index)
 	return k < 0 ? vec3(0.0f) : eta * L + (eta * cosi - sqrtf(k)) * n;
 }
 
-bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& hitPoint, vec3& N, Material& material)
+bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, HitPayload& hitPayload)
 {
 	float sphere_dist = std::numeric_limits<float>::max();
 	for (auto& sphere : spheres) {
 		float dist_i;
 		if (sphere.hit(ray, dist_i) && dist_i < sphere_dist) {
 			sphere_dist = dist_i;
-			hitPoint = ray.at(dist_i);
-			N = (hitPoint - sphere.center).normalized();
-			material = sphere.material;
+			hitPayload.p = ray.at(dist_i);
+			hitPayload.normal = (hitPayload.p - sphere.GetCenter()).normalized();
+			hitPayload.material = sphere.GetMaterial();
 		}
 	}
 
@@ -111,10 +63,10 @@ bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& h
 		vec3 pt = ray.orig + ray.dir * d;
 		if (d > 0 && fabs(pt.x) < 10 && pt.z < -10 && pt.z > -30 && d < sphere_dist) {
 			checkerboard_dist = d;
-			hitPoint = pt;
-			N = vec3(0.0f, 1.0f, 0.0f);
-			material.diffuse_color = (int(0.5f * hitPoint.x + 1000) + int(0.5f * hitPoint.z)) & 1 ? vec3(1.0f) : vec3(1.0f, 0.7f, 0.3f); // 设置为棋盘图案
-			material.diffuse_color = material.diffuse_color * 0.3f;
+			hitPayload.p = pt;
+			hitPayload.normal = vec3(0.0f, 1.0f, 0.0f);
+			hitPayload.material.diffuse_color = (int(0.5f * hitPayload.p.x + 1000) + int(0.5f * hitPayload.p.z)) & 1 ? vec3(1.0f) : vec3(1.0f, 0.7f, 0.3f); // 设置为棋盘图案
+			hitPayload.material.diffuse_color = hitPayload.material.diffuse_color * 0.3f;
 		}
 	}
 	return std::min(sphere_dist, checkerboard_dist) < 1000.0f;
@@ -122,10 +74,9 @@ bool scene_intersect(const Ray& ray, const std::vector<Sphere>& spheres, vec3& h
 
 vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vector<Light>& lights, size_t depth = 0)
 {
-	vec3 point, N;
-	Material material;
+	HitPayload hitPayload;
 	// background color
-	if (depth > 4 || !scene_intersect(ray, spheres, point, N, material)) {
+	if (depth > 4 || !scene_intersect(ray, spheres, hitPayload)) {
 		// background color
 		float phi = atan2(ray.dir.z, ray.dir.x); // [-π, π]
 		float theta = acos(ray.dir.y); // [0, π]
@@ -148,6 +99,12 @@ vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vect
 		- acos(-1) = π
 	 */
 
+	vec3 point, N;
+	Material material;
+	point = hitPayload.p;
+	N = hitPayload.normal;
+	material = hitPayload.material;
+
 	vec3 reflect_dir = reflect(-ray.dir, N).normalized();
 	vec3 reflect_orig = dot(reflect_dir, N) < 0 ? point - N * 0.001f : point + N * 0.001f; // 修改了一个小错误
 	vec3 reflect_color = castRay(Ray(reflect_orig, reflect_dir), spheres, lights, depth + 1);
@@ -162,9 +119,9 @@ vec3 castRay(const Ray& ray, const std::vector<Sphere>& spheres, const std::vect
 		float light_distance = (lights[i].position - point).norm();
 
 		vec3 shadow_orig = dot(light_dir, N) < 0 ? point - N * 0.001f : point + N * 0.001f; // 防止阴影自相交
-		vec3 shadow_pt, shadow_N;
-		Material tmp;
-		if (scene_intersect(Ray(shadow_orig, light_dir), spheres, shadow_pt, shadow_N, tmp) && (shadow_pt - shadow_orig).norm() < light_distance)
+		
+		HitPayload shadowPayload;
+		if (scene_intersect(Ray(shadow_orig, light_dir), spheres, shadowPayload) && (shadowPayload.p - shadow_orig).norm() < light_distance)
 			continue;
 
 		diffuse_light_intensity += lights[i].intensity * std::max(0.0f, dot(light_dir, N));
